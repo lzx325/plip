@@ -7,6 +7,8 @@ import scipy as sp
 import pandas as pd
 from PIL import Image
 
+from transformers import CLIPProcessor, CLIPModel
+
 def list_images_nonrecursively(directory):
     image_suffixes = ["jpg", "png","JPEG","PNG"]
     image_files = list()
@@ -106,10 +108,10 @@ class QueryEmbedder:
 class ImageRetriever:
     def __init__(self, K=50):
         self.evaluators = {
-            "Recall@1" : RecallAtK(1),
+            "Recall@6" : RecallAtK(6),
             "Recall@10": RecallAtK(10),
             # "Recall@50": RecallAtK(50),
-            "NDCG@1": NDCGAtK(1),
+            "NDCG@6": NDCGAtK(6),
             "NDCG@10": NDCGAtK(10),
             # "NDCG@50": NDCGAtK(50)
         }
@@ -185,6 +187,16 @@ class ImageSearcher:
     def get_ground_truth_list(database_eb, query_eb):
         ground_truth_list=list()
         for query_fp in query_eb.query_image_fp_list:
+            gt_index = database_eb.metadata.index[database_eb.metadata["image_class"] == query_eb.metadata.loc[query_fp]["image_class"]].tolist()
+            gt_index = database_eb.fp_to_index(gt_index)
+            ground_truth_list.append(gt_index)
+
+        return ground_truth_list
+
+    @staticmethod
+    def get_ground_truth_list2(database_eb, query_eb):
+        ground_truth_list=list()
+        for query_fp in query_eb.query_image_fp_list:
             gt_index = database_eb.fp_to_index(query_fp)
             ground_truth_list.append([gt_index])
         return ground_truth_list
@@ -201,8 +213,7 @@ class ImageSearcher:
         query_eb.init_from_directory(query_image_dir, metadata=query_image_metadata)
         
         ground_truth_list = self.get_ground_truth_list(database_eb, query_eb)
-        
-        ir = ImageRetriever()
+        ir = ImageRetriever(K=10)
         return ir.retrieval(database_eb.database_embeddings, query_eb.query_embeddings, ground_truth_list)
 
 class DefaultEmbedding:
@@ -211,11 +222,22 @@ class DefaultEmbedding:
         emb /= np.linalg.norm(emb)
         return emb
 
+class PLIPEmbedding:
+    def __init__(self):
+        self.model = CLIPModel.from_pretrained("downloaded_data/plip")
+        self.processor = CLIPProcessor.from_pretrained("downloaded_data/plip")
+    def __call__(self, image):
+        inputs = self.processor(text=["a histopathological image"],images=[image], return_tensors="pt")
+        outputs = self.model(**inputs)
+        emb = outputs["vision_model_output"].pooler_output[0].detach().numpy()
+        emb = emb / np.linalg.norm(emb)
+        return emb
+
 if __name__=="__main__":
     np.random.seed(0)
-    database_dir="mutation_images/Figure S7a supp figure transcriptomic"
-    query_image_dir="mutation_images/Figure S7a supp figure transcriptomic"
-    searcher = ImageSearcher(DefaultEmbedding())
+    database_dir="mutation_images/image_search_examples/database_images"
+    query_image_dir="mutation_images/image_search_examples/query_images"
+    searcher = ImageSearcher(PLIPEmbedding())
     retrieved_indices, metrics = searcher.search(database_dir, query_image_dir)
-    print(retrieved_indices)
+    print(metrics)
     
