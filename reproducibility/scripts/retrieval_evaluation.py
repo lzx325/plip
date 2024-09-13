@@ -55,4 +55,4 @@ if __name__ == "__main__":
 
     rs = ResultsHandler(args.dataset, "retrieval", additional_parameters)
     rs.add(results)
-
+    

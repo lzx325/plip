@@ -4,3 +4,4 @@
 *.pyc
 *debug.py
 config.env
+/downloaded_data
