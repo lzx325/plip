@@ -4,6 +4,5 @@
 *.pyc
 *debug.py
 config.env
-/downloaded_data
-/mutation_images
+/bulk_data
 /dcgm
